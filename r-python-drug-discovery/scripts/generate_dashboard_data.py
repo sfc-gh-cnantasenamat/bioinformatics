@@ -8,7 +8,7 @@ Produces:
   dashboard_predictions.csv actual vs predicted pIC50 (batch inference via Plumber)
 
 Usage:
-  cd /path/to/build-r-python-drug-discovery-apps-and-agents
+  cd /path/to/bioinformatics/r-python-drug-discovery
   python scripts/generate_dashboard_data.py
 """
 
