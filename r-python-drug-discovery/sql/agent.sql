@@ -3,78 +3,275 @@ USE ROLE QSAR_ROLE;
 USE WAREHOUSE QSAR_WH;
 USE SCHEMA QSAR_DB.PUBLIC;
 
-CREATE OR REPLACE SEMANTIC VIEW AROMATASE_SV
-  TABLES (
-    compounds AS CHEMBL1978_COMPOUNDS PRIMARY KEY (MOLECULE_CHEMBL_ID),
-    predictions AS CHEMBL1978_PREDICTIONS PRIMARY KEY (MOLECULE_CHEMBL_ID),
-    descriptors AS CHEMBL1978_DESCRIPTORS PRIMARY KEY (MOLECULE_CHEMBL_ID),
-    fingerprints AS CHEMBL1978_FINGERPRINTS PRIMARY KEY (MOLECULE_CHEMBL_ID),
-    assays AS CHEMBL1978_ASSAYS PRIMARY KEY (ASSAY_CHEMBL_ID),
-    documents AS CHEMBL1978_DOCUMENTS PRIMARY KEY (DOCUMENT_CHEMBL_ID),
-    prediction_log AS QSAR_PREDICTIONS_LOG PRIMARY KEY (PREDICTION_ID)
-  )
-  RELATIONSHIPS (
-    predictions(MOLECULE_CHEMBL_ID) REFERENCES compounds(MOLECULE_CHEMBL_ID),
-    descriptors(MOLECULE_CHEMBL_ID) REFERENCES compounds(MOLECULE_CHEMBL_ID),
-    fingerprints(MOLECULE_CHEMBL_ID) REFERENCES compounds(MOLECULE_CHEMBL_ID),
-    compounds(ASSAY_CHEMBL_ID) REFERENCES assays(ASSAY_CHEMBL_ID),
-    assays(DOCUMENT_CHEMBL_ID) REFERENCES documents(DOCUMENT_CHEMBL_ID)
-  )
-  FACTS (
-    compounds.measured_pic50 AS compounds.PCHEMBL_VALUE,
-    compounds.active_flag AS compounds.ACTIVITY_CLASS,
-    predictions.predicted_pic50 AS predictions.PRED_PIC50,
-    predictions.prediction_error AS predictions.ERROR,
-    descriptors.molecular_weight AS descriptors.MW,
-    descriptors.logp AS descriptors.LOGP,
-    descriptors.hba AS descriptors.HBA,
-    descriptors.hbd AS descriptors.HBD,
-    descriptors.tpsa AS descriptors.TPSA,
-    descriptors.ro5_violations AS descriptors.RO5_VIOLATIONS,
-    fingerprints.bit_count AS ARRAY_SIZE(fingerprints.ECFP4_BITS),
-    prediction_log.predicted_pic50 AS prediction_log.PREDICTED_PIC50
-  )
-  DIMENSIONS (
-    compounds.molecule_id AS compounds.MOLECULE_CHEMBL_ID,
-    compounds.smiles AS compounds.CANONICAL_SMILES,
-    compounds.activity_label AS CASE WHEN compounds.ACTIVITY_CLASS = 1 THEN 'Active' ELSE 'Inactive' END,
-    assays.assay_id AS assays.ASSAY_CHEMBL_ID,
-    assays.assay_type AS assays.ASSAY_TYPE,
-    assays.assay_description AS assays.DESCRIPTION,
-    documents.document_id AS documents.DOCUMENT_CHEMBL_ID,
-    documents.title AS documents.TITLE,
-    documents.journal AS documents.JOURNAL,
-    documents.publication_year AS TRY_TO_NUMBER(documents.YEAR),
-    descriptors.ro5_pass AS descriptors.RO5_PASS,
-    prediction_log.predicted_at AS prediction_log.PREDICTED_AT,
-    prediction_log.service_user AS prediction_log.USER_NAME
-  )
-  METRICS (
-    compounds.compound_count AS COUNT(*),
-    compounds.active_count AS SUM(compounds.active_flag),
-    compounds.mean_measured_pic50 AS AVG(compounds.measured_pic50),
-    predictions.mean_predicted_pic50 AS AVG(predictions.predicted_pic50),
-    predictions.rmse AS SQRT(AVG(POWER(predictions.prediction_error, 2))),
-    descriptors.ro5_pass_count AS COUNT_IF(descriptors.ro5_pass),
-    fingerprints.mean_bits_on AS AVG(fingerprints.bit_count),
-    prediction_log.request_count AS COUNT(*)
-  )
-  COMMENT = 'Measured human aromatase bioactivity and model scores; compound grain, one selected assay per compound. Training and test rows are mixed.'
-  AI_VERIFIED_QUERIES (
-    compound_totals AS (
-      QUESTION 'How many compounds and actives are in the aromatase dataset?'
-      ONBOARDING_QUESTION TRUE
-      SQL 'SELECT * FROM SEMANTIC_VIEW(QSAR_DB.PUBLIC.AROMATASE_SV METRICS compounds.compound_count, compounds.active_count)'
-    ),
-    activity_breakdown AS (
-      QUESTION 'How many active and inactive aromatase compounds are there?'
-      SQL 'SELECT * FROM SEMANTIC_VIEW(QSAR_DB.PUBLIC.AROMATASE_SV DIMENSIONS compounds.activity_label METRICS compounds.compound_count)'
-    ),
-    ro5_total AS (
-      QUESTION 'How many compounds pass the Rule of Five?'
-      SQL 'SELECT * FROM SEMANTIC_VIEW(QSAR_DB.PUBLIC.AROMATASE_SV METRICS descriptors.ro5_pass_count)'
-    )
-  );
+-- Create AROMATASE_SV from the Apache Ossie 0.1.1 specification (agent/aromatase_sv_ossie.yaml)
+CALL SYSTEM$CREATE_SEMANTIC_VIEW_FROM_OSSIE_YAML('QSAR_DB.PUBLIC', $$
+version: 0.1.1
+semantic_model:
+  - name: AROMATASE_SV
+    description: "Measured human aromatase bioactivity and model scores; compound grain, one selected assay per compound. Training and test rows are mixed."
+    datasets:
+      - name: ASSAYS
+        source: QSAR_DB.PUBLIC.CHEMBL1978_ASSAYS
+        primary_key:
+          - ASSAY_CHEMBL_ID
+        fields:
+          - name: ASSAY_DESCRIPTION
+            expression:
+              dialects:
+                - dialect: SNOWFLAKE
+                  expression: assays.DESCRIPTION
+            dimension: {}
+          - name: ASSAY_ID
+            expression:
+              dialects:
+                - dialect: SNOWFLAKE
+                  expression: assays.ASSAY_CHEMBL_ID
+            dimension: {}
+          - name: ASSAY_TYPE
+            expression:
+              dialects:
+                - dialect: SNOWFLAKE
+                  expression: assays.ASSAY_TYPE
+            dimension: {}
+      - name: COMPOUNDS
+        source: QSAR_DB.PUBLIC.CHEMBL1978_COMPOUNDS
+        primary_key:
+          - MOLECULE_CHEMBL_ID
+        fields:
+          - name: ACTIVITY_LABEL
+            expression:
+              dialects:
+                - dialect: SNOWFLAKE
+                  expression: CASE WHEN compounds.ACTIVITY_CLASS = 1 THEN 'Active' ELSE 'Inactive' END
+            dimension: {}
+          - name: MOLECULE_ID
+            expression:
+              dialects:
+                - dialect: SNOWFLAKE
+                  expression: compounds.MOLECULE_CHEMBL_ID
+            dimension: {}
+          - name: SMILES
+            expression:
+              dialects:
+                - dialect: SNOWFLAKE
+                  expression: compounds.CANONICAL_SMILES
+            dimension: {}
+          - name: ACTIVE_FLAG
+            expression:
+              dialects:
+                - dialect: SNOWFLAKE
+                  expression: compounds.ACTIVITY_CLASS
+          - name: MEASURED_PIC50
+            expression:
+              dialects:
+                - dialect: SNOWFLAKE
+                  expression: compounds.PCHEMBL_VALUE
+      - name: DESCRIPTORS
+        source: QSAR_DB.PUBLIC.CHEMBL1978_DESCRIPTORS
+        primary_key:
+          - MOLECULE_CHEMBL_ID
+        fields:
+          - name: RO5_PASS
+            expression:
+              dialects:
+                - dialect: SNOWFLAKE
+                  expression: descriptors.RO5_PASS
+            dimension: {}
+          - name: HBA
+            expression:
+              dialects:
+                - dialect: SNOWFLAKE
+                  expression: descriptors.HBA
+          - name: HBD
+            expression:
+              dialects:
+                - dialect: SNOWFLAKE
+                  expression: descriptors.HBD
+          - name: LOGP
+            expression:
+              dialects:
+                - dialect: SNOWFLAKE
+                  expression: descriptors.LOGP
+          - name: MOLECULAR_WEIGHT
+            expression:
+              dialects:
+                - dialect: SNOWFLAKE
+                  expression: descriptors.MW
+          - name: RO5_VIOLATIONS
+            expression:
+              dialects:
+                - dialect: SNOWFLAKE
+                  expression: descriptors.RO5_VIOLATIONS
+          - name: TPSA
+            expression:
+              dialects:
+                - dialect: SNOWFLAKE
+                  expression: descriptors.TPSA
+      - name: DOCUMENTS
+        source: QSAR_DB.PUBLIC.CHEMBL1978_DOCUMENTS
+        primary_key:
+          - DOCUMENT_CHEMBL_ID
+        fields:
+          - name: DOCUMENT_ID
+            expression:
+              dialects:
+                - dialect: SNOWFLAKE
+                  expression: documents.DOCUMENT_CHEMBL_ID
+            dimension: {}
+          - name: JOURNAL
+            expression:
+              dialects:
+                - dialect: SNOWFLAKE
+                  expression: documents.JOURNAL
+            dimension: {}
+          - name: PUBLICATION_YEAR
+            expression:
+              dialects:
+                - dialect: SNOWFLAKE
+                  expression: TRY_TO_NUMBER(documents.YEAR)
+            dimension: {}
+          - name: TITLE
+            expression:
+              dialects:
+                - dialect: SNOWFLAKE
+                  expression: documents.TITLE
+            dimension: {}
+      - name: FINGERPRINTS
+        source: QSAR_DB.PUBLIC.CHEMBL1978_FINGERPRINTS
+        primary_key:
+          - MOLECULE_CHEMBL_ID
+        fields:
+          - name: BIT_COUNT
+            expression:
+              dialects:
+                - dialect: SNOWFLAKE
+                  expression: ARRAY_SIZE(fingerprints.ECFP4_BITS)
+      - name: PREDICTIONS
+        source: QSAR_DB.PUBLIC.CHEMBL1978_PREDICTIONS
+        primary_key:
+          - MOLECULE_CHEMBL_ID
+        fields:
+          - name: PREDICTED_PIC50
+            expression:
+              dialects:
+                - dialect: SNOWFLAKE
+                  expression: predictions.PRED_PIC50
+          - name: PREDICTION_ERROR
+            expression:
+              dialects:
+                - dialect: SNOWFLAKE
+                  expression: predictions.ERROR
+      - name: PREDICTION_LOG
+        source: QSAR_DB.PUBLIC.QSAR_PREDICTIONS_LOG
+        primary_key:
+          - PREDICTION_ID
+        fields:
+          - name: PREDICTED_AT
+            expression:
+              dialects:
+                - dialect: SNOWFLAKE
+                  expression: prediction_log.PREDICTED_AT
+            dimension: {}
+          - name: SERVICE_USER
+            expression:
+              dialects:
+                - dialect: SNOWFLAKE
+                  expression: prediction_log.USER_NAME
+            dimension: {}
+          - name: PREDICTED_PIC50
+            expression:
+              dialects:
+                - dialect: SNOWFLAKE
+                  expression: prediction_log.PREDICTED_PIC50
+    relationships:
+      - name: ASSAYS_TO_DOCUMENTS
+        from: ASSAYS
+        to: DOCUMENTS
+        from_columns:
+          - DOCUMENT_CHEMBL_ID
+        to_columns:
+          - DOCUMENT_CHEMBL_ID
+      - name: COMPOUNDS_TO_ASSAYS
+        from: COMPOUNDS
+        to: ASSAYS
+        from_columns:
+          - ASSAY_CHEMBL_ID
+        to_columns:
+          - ASSAY_CHEMBL_ID
+      - name: DESCRIPTORS_TO_COMPOUNDS
+        from: DESCRIPTORS
+        to: COMPOUNDS
+        from_columns:
+          - MOLECULE_CHEMBL_ID
+        to_columns:
+          - MOLECULE_CHEMBL_ID
+      - name: FINGERPRINTS_TO_COMPOUNDS
+        from: FINGERPRINTS
+        to: COMPOUNDS
+        from_columns:
+          - MOLECULE_CHEMBL_ID
+        to_columns:
+          - MOLECULE_CHEMBL_ID
+      - name: PREDICTIONS_TO_COMPOUNDS
+        from: PREDICTIONS
+        to: COMPOUNDS
+        from_columns:
+          - MOLECULE_CHEMBL_ID
+        to_columns:
+          - MOLECULE_CHEMBL_ID
+    metrics:
+      - name: compound_count
+        expression:
+          dialects:
+            - dialect: SNOWFLAKE
+              expression: COUNT(compounds.molecule_id)
+        description: Total number of deduplicated aromatase compounds
+      - name: active_count
+        expression:
+          dialects:
+            - dialect: SNOWFLAKE
+              expression: SUM(compounds.active_flag)
+        description: Number of measured active compounds (pIC50 >= 6.5)
+      - name: mean_measured_pic50
+        expression:
+          dialects:
+            - dialect: SNOWFLAKE
+              expression: AVG(compounds.measured_pic50)
+        description: Mean measured pIC50 across compounds
+      - name: mean_predicted_pic50
+        expression:
+          dialects:
+            - dialect: SNOWFLAKE
+              expression: AVG(predictions.predicted_pic50)
+        description: Mean predicted pIC50 from the R QSAR model
+      - name: rmse
+        expression:
+          dialects:
+            - dialect: SNOWFLAKE
+              expression: SQRT(AVG(POWER(predictions.prediction_error, 2)))
+        description: Root mean squared error across scored compounds
+      - name: ro5_pass_count
+        expression:
+          dialects:
+            - dialect: SNOWFLAKE
+              expression: COUNT_IF(descriptors.ro5_pass)
+        description: Number of compounds passing Lipinski's Rule of Five
+      - name: mean_bits_on
+        expression:
+          dialects:
+            - dialect: SNOWFLAKE
+              expression: AVG(fingerprints.bit_count)
+        description: Mean number of active ECFP4 bits per molecule
+      - name: request_count
+        expression:
+          dialects:
+            - dialect: SNOWFLAKE
+              expression: COUNT(prediction_log.predicted_at)
+        description: Total logged prediction requests
+    custom_extensions:
+      - vendor_name: SNOWFLAKE
+        data: '{"verified_queries":[{"name":"COMPOUND_TOTALS","sql":"SELECT * FROM SEMANTIC_VIEW(QSAR_DB.PUBLIC.AROMATASE_SV METRICS compound_count, active_count)","question":"How many compounds and actives are in the aromatase dataset?","use_as_onboarding_question":true},{"name":"ACTIVITY_BREAKDOWN","sql":"SELECT * FROM SEMANTIC_VIEW(QSAR_DB.PUBLIC.AROMATASE_SV DIMENSIONS compounds.activity_label METRICS compound_count)","question":"How many active and inactive aromatase compounds are there?"},{"name":"RO5_TOTAL","sql":"SELECT * FROM SEMANTIC_VIEW(QSAR_DB.PUBLIC.AROMATASE_SV METRICS ro5_pass_count)","question":"How many compounds pass the Rule of Five?"}]}'
+$$);
 
 -- One search row per measured molecule and assay. Repeated raw measurements
 -- for the same molecule, assay and document are deduplicated by SELECT DISTINCT.

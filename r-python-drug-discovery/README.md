@@ -19,7 +19,7 @@ data/        Snapshot of the cleaned ChEMBL1978 IC50 dataset (2,751 compounds) u
 docker/      R training script, Plumber API, Dockerfile, SPCS spec, bundled model artifacts
 streamlit/   Multipage app (Dashboard, Single Prediction, Batch Prediction, About, and Ask an Agent)
 notebooks/   01: raw ChEMBL, assays, publications, and EDA; 02: SQL scoring and agent tables
-agent/       Cortex Agent spec and 15-question evaluation fixtures
+agent/       Cortex Agent spec, Apache Ossie semantic model (aromatase_sv_ossie.yaml), and 15-question evaluation fixtures
 native_app/  Optional Native App package for per-consumer MCP deployment
 scripts/     Endpoint smoke test, dashboard data generator, and agent deployment script
 sql/         Setup, R-backed SQL functions, semantic view, Cortex Search, and triage procedure
@@ -104,7 +104,7 @@ The developer guide walks through each step in detail.
    snow streamlit deploy --replace
    cd ..
    ```
-9. **Deploy and evaluate the Cortex Agent (`AROMATASE_AGENT`).** Notebook 01 fetches 313 assay descriptions and 198 publication records, and Notebook 02 writes per-molecule predictions, full CDK fingerprints, and Rule of Five descriptors. Run `sql/agent.sql` to create the `AROMATASE_SV` semantic view, `ASSAY_SEARCH` Cortex Search service, and `TRIAGE_COMPOUNDS` procedure, then deploy `AROMATASE_AGENT` from `agent/aromatase_agent.yaml`:
+9. **Deploy and evaluate the Cortex Agent (`AROMATASE_AGENT`).** Notebook 01 fetches 313 assay descriptions and 198 publication records, and Notebook 02 writes per-molecule predictions, full CDK fingerprints, and Rule of Five descriptors. Run `sql/agent.sql` to create the `AROMATASE_SV` semantic view from the Apache Ossie `0.1.1` specification (`agent/aromatase_sv_ossie.yaml` via `SYSTEM$CREATE_SEMANTIC_VIEW_FROM_OSSIE_YAML`), the `ASSAY_SEARCH` Cortex Search service, and the `TRIAGE_COMPOUNDS` procedure, then deploy `AROMATASE_AGENT` from `agent/aromatase_agent.yaml`:
    ```bash
    python scripts/deploy_agent.py --connection <your_connection>
    ```
