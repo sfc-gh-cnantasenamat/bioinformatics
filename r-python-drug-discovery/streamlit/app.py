@@ -34,7 +34,7 @@ except Exception:
 _ALL_CLASSES = ["Active", "Intermediate", "Inactive"]
 
 with st.sidebar:
-    st.title(":material/science: AromatasePred")
+    st.title(":material/science: QSAR Drug Discovery")
     st.caption(
         "Predict aromatase inhibitory activity (pIC50) of small molecules "
         "using a Random Forest model trained on Human aromatase (CYP19A1) [ChEMBL1978]."

@@ -1,5 +1,5 @@
 """
-Smoke-test the AromatasePred R Plumber service through its public endpoint.
+Smoke-test the QSAR Drug Discovery R Plumber service through its public endpoint.
 
 Usage:
     export QSAR_ENDPOINT="https://<your-ingress-url>"

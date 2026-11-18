@@ -1,5 +1,5 @@
 -- =============================================================================
--- AromatasePred: shared SQL function layer
+-- QSAR Drug Discovery: shared SQL function layer
 --
 -- Run after the R service QSAR_PLUMBER_SVC is READY. The four service functions
 -- call the R Plumber container, so fingerprints, predictions, similarity, and

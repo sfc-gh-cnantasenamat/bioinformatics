@@ -1,5 +1,5 @@
 -- =============================================================================
--- AromatasePred: Snowflake setup for the R Plumber inference service
+-- QSAR Drug Discovery: Snowflake setup for the R Plumber inference service
 --
 -- Run steps 1-2 as ACCOUNTADMIN, then switch to QSAR_ROLE for the rest.
 -- Replace <your_user> before running.
